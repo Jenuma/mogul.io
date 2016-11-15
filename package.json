@@ -1,0 +1,11 @@
+{
+  "name": "mogul.io",
+  "version": "0.0.1",
+  "description": "System of components for tracking my finances.",
+  "main": "mogul.io.js",
+  "author": "Clifton Roberts",
+  "dependencies": {
+    "request": "2.78.0",
+    "cheerio": "0.22.0"
+  }
+}
