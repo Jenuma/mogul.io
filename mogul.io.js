@@ -2,33 +2,83 @@ var casper = require("casper").create();
 var fs = require("fs");
 var cred = require("cred.json");
 
+casper.on("resource.requested", function(request) {
+    console.log("Requested: " + request.method + " " + request.url);
+});
+
+casper.on("resource.received", function(resource) {
+    console.log("Received: " + resource.url);
+})
+
+casper.on("navigation.requested", function(url, navigationType, navigationLocked, isMainFrame) {
+    console.log("Navigation: " + navigationType + " to " + url);
+});
+
+casper.on("wait.start", function() {
+    console.log("Started waiting...");
+});
+
+casper.on("wait.done", function() {
+    console.log("Finished waiting...");
+});
+
+casper.on("waitFor.timeout", function(timeout, details) {
+    console.log("Timed out waiting for " + details.selector);
+});
+
+casper.on("step.timeout", function(step, timeout) {
+    console.log("Timed out waiting for " + step);
+});
+
+casper.on("error", function(msg, backtrace) {
+    console.log("Uncaught error: " + msg + " Trace: " + backtrace);
+});
+
+casper.on("step.error", function(err) {
+    console.log("Step failed: " + err);
+});
+
+casper.on("complete.error", function(err) {
+    console.log("Complete callback failed: " + err);
+});
+
+casper.on("run.complete", function() {
+    console.log("Casper completed successfully.");
+});
+
 /*
  * Start adding to Casper's queue by going to the service's homepage.
+ * Viewport must be set to at least 768w to access desktop layout.
  */
 casper.start();
-
 casper.viewport(768, 300);
-
 casper.thenOpen(cred.url);
 
+/*
+ * Login to the service.
+ */
 casper.then(function() {
     console.log(casper.getTitle());
-    casper.capture("debug-1-login.png");
     
     console.log("Waiting for login form to load...");
     casper.waitForSelector("form.regions-olb-login-form", login, loginTimeout);
 });
 
+/*
+ * Callback for when the login form loads.
+ */
 function login() {
     console.log("Inside login() function...");
-    if(casper.exists("input[name='OnlineID']") && casper.exists("input[name='Password']")) {
-        console.log("Login form input fields exist...");
-        casper.fillSelectors("form.regions-olb-login-form", {
-            "input[name='OnlineID']": cred.username,
-            "input[name='Password']": cred.password
-            }, false);
-        casper.click("button.regions-olb-login-button");
-        console.log("Filled login form and submitted...");    
+    if(casper.exists("input[name='UserName']") &&
+       casper.exists("input[name='OnlineID']") && 
+       casper.exists("input[name='Password']")) {
+            console.log("Login form input fields exist...");
+            casper.fillSelectors("form.regions-olb-login-form", {
+                "input[name='UserName']": cred.username,
+                "input[name='OnlineID']": cred.username,
+                "input[name='Password']": cred.password
+                }, true);
+            console.log("Filled login form and submitted...");    
     } else {
         console.log("ERROR: Login form seems invalid.");
         casper.capture("error-invalid-login-form.png");
@@ -36,6 +86,9 @@ function login() {
     }
 }
 
+/*
+ * Callback for when the login form takes to long to load or doesn't exist.
+ */
 function loginTimeout() {
     console.log("Inside loginTimeout() function...");
     console.log("ERROR: Timed out waiting for login form.");
@@ -43,21 +96,31 @@ function loginTimeout() {
     exit(1);
 }
 
+/*
+ * Wait for login.
+ */
 casper.then(function() {
     console.log("Waiting for login response...");
-    casper.capture("what-are-you-waiting-on.png");
-    casper.waitWhileVisibile("form.regions-olb-login-form", function() {
+    
+    if(casper.exists("form.regions-olb-login-form")) {
+        casper.waitWhileVisible("form.regions-olb-login-form", function() {
             console.log("Login form no longer visible.");
         }, function() {
             console.log("ERROR: Timed out waiting for login response.");
             casper.capture("error-login-submit-timeout.png");
             exit(1);
         });
+    } else {
+        console.log("Login form not visible...");
+        casper.capture();
+    }
 });
 
+/*
+ * Answer security question, if prompted.
+ */
 casper.then(function() {
     console.log(casper.getTitle());
-    casper.capture("debug-2-sec-question.png");
     
     if(casper.exists("label[for='Answer']")) {
         console.log("Security question form exists...");
@@ -82,7 +145,7 @@ casper.then(function() {
         
         if(casper.exists("input[name='Answer']")) {
             console.log("Security answer input field exists...");
-            casper.fillSelector("form", {
+            casper.fillSelectors("form", {
                 "input[name='Answer']": answer
                 }, true);
         } else {
@@ -95,13 +158,17 @@ casper.then(function() {
     }
 });
 
+/*
+ * Get balance.
+ */
 casper.then(function() {
-    console.log(this.getTitle());
-    casper.capture("debug-3-balance.png");
-    
     if(casper.exists(".value")) {
         console.log("Balance value exists...");
-        console.log("Value: " + casper.fetchText(".value"));
+        
+        var balanceValue = casper.fetchText(".value");
+        balanceValue = balanceValue.match(/\$(?:,?\d{0,3})*\.\d\d/);
+        
+        console.log("Value: " + balanceValue);
     } else {
         console.log("ERROR: Balance value seems invalid.");
         casper.capture("error-balance-invalid");
@@ -109,23 +176,10 @@ casper.then(function() {
     }
 });
 
-casper.then(function() {
-    if(casper.exists("a")) {
-        console.log("There are links on the balance page...");
-        if(casper.fetchText("a").includes("Log Out")) {
-            console.log("There is a log out link on the balance page...");
-            this.clickLabel("Log Out", "a");
-        } else {
-            console.log("ERROR: No log out links found.");
-            casper.capture("error-balance-no-log-out-link.png");
-            exit(1);
-        }
-    } else {
-        console.log("ERROR: No links found.");
-        casper.capture("error-balance-no-links-found.png");
-        exit(1);
-    }
-});
+/*
+ * Log out of the service.
+ */
+casper.thenOpen("https://onlinebanking.regions.com/authentication/signedout");
 
 /*
  * Run the script and exit when finished.
@@ -137,8 +191,8 @@ casper.run(function() {
 
 function exit(status) {
     console.log("Exit called...");
-    casper.exit();
-    phantom.exit(status);
+    //casper.exit();
+    //phantom.exit(status);
 }
 
 /*
