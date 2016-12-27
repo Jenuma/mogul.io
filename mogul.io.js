@@ -67,6 +67,7 @@ casper.on("run.complete", function() {
  * Viewport must be set to at least 768w to access desktop layout.
  */
 casper.start();
+casper.userAgent("mogul.io/Personal Regions Scraper by Jenuma. See https://github.com/Jenuma/mogul.io for more information.");
 casper.viewport(768, 300);
 casper.thenOpen(cred.url, function() {
     casper.log("Opened " + cred.url, "info");
