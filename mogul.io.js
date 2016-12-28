@@ -14,6 +14,11 @@ var casper = require("casper").create({
 });
 
 /*
+ * Flag which, if set to true, will allow script to write balance to output.txt.
+ */
+var writeBalanceToFile = false;
+
+/*
  * Casper Event Listeners
  *
  * These are essential for debugging.
@@ -180,7 +185,10 @@ casper.then(function() {
         balanceValue = balanceValue.match(/\$(?:,?\d{0,3})*\.\d\d/);
         
         casper.log("Value: " + balanceValue, "info");
-        fs.write("output.txt", balanceValue, "w");
+        
+        if(writeBalanceToFile) {
+            fs.write("output.txt", balanceValue, "w");
+        }
     } else {
         casper.log("Balance value seems invalid.", "error");
         casper.capture("error-balance-invalid");
