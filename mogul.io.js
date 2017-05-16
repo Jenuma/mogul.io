@@ -99,7 +99,7 @@ function login() {
                 "input[name='OnlineID']": cred.username,
                 "input[name='Password']": cred.password
                 }, true);
-            casper.log("Filled login form and submitted", "debug");    
+            casper.log("Filled login form and submitted", "debug");
     } else {
         casper.log("Login form seems invalid", "error");
         casper.capture("error-invalid-login-form.png");
@@ -175,6 +175,23 @@ casper.then(function() {
 });
 
 /*
+ * Wait for security question authentication.
+ */
+casper.then(function() {
+    if(casper.exists("label[for='Answer']")) {
+        casper.waitWhileVisible("label[for='Answer']", function() {
+            casper.log("Security question form no longer visible", "debug");
+        }, function() {
+            casper.log("Timed out waiting for security question response.", "error");
+            casper.capture("error-security-question-submit-timeout.png");
+            exit(1);
+        });
+    } else {
+        casper.log("Security question form not visible", "debug");
+    }
+});
+
+/*
  * Get balance.
  */
 casper.then(function() {
@@ -191,7 +208,7 @@ casper.then(function() {
         }
     } else {
         casper.log("Balance value seems invalid.", "error");
-        casper.capture("error-balance-invalid");
+        casper.capture("error-balance-invalid.png");
         exit(1);
     }
 });
